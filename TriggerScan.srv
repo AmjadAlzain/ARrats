@@ -1,0 +1,4 @@
+# The request is empty because the act of calling is the trigger.
+---
+# The response will contain the text read by the camera.
+string ocr_text
