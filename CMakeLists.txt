@@ -209,7 +209,10 @@ catkin_install_python(PROGRAMS
   nodes/speech_interface_node.py
   nodes/vision_node.py
   nodes/allergen_manager_node.py
+  nodes/google_ocr_node.py
+  nodes/allergen_detection_node.py
+  nodes/capture_preprocess_node.py
+  nodes/ocr_node.py
+  nodes/verbal_reporter_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
-
-    

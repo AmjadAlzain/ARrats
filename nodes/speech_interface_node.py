@@ -1,77 +1,74 @@
 #!/usr/bin/env python
-# --- IMPORTS ---
 import rospy
 import speech_recognition as sr
 import pyttsx3
 from std_msgs.msg import String
 
-# --- CLASS DEFINITION ---
 class SpeechInterface:
     def __init__(self):
-        # Initialize ROS node
         rospy.init_node('speech_interface_node', anonymous=True)
-
-        # Publisher for user commands (text)
         self.command_pub = rospy.Publisher('/juno/user_command', String, queue_size=10)
-
-        # Subscriber for robot responses (text)
         rospy.Subscriber('/juno/robot_response', String, self.speak_response)
-
-        # Initialize Text-to-Speech (TTS) engine
         self.tts_engine = pyttsx3.init()
-
-        # Initialize Speech-to-Text (STT) recognizer
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
-
-        # Calibrate microphone for ambient noise
         with self.microphone as source:
-            rospy.loginfo("Calibrating microphone for ambient noise...")
+            rospy.loginfo("Calibrating microphone...")
             self.recognizer.adjust_for_ambient_noise(source)
             rospy.loginfo("Calibration complete. Ready to listen.")
 
     def speak_response(self, msg):
-        """Callback function to speak out the robot's response."""
         rospy.loginfo("Juno says: %s", msg.data)
         self.tts_engine.say(msg.data)
         self.tts_engine.runAndWait()
 
+# This is inside the SpeechInterface class in speech_interface_node.py
+
     def listen_for_commands(self):
-        """Main loop to listen for the activation word and subsequent commands."""
         while not rospy.is_shutdown():
             with self.microphone as source:
-                rospy.loginfo("Listening for activation word 'Juno'...")
+                rospy.loginfo("Listening for activation word 'Hello'...")
                 try:
-                    # Listen for audio with a timeout
-                    audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=2)
-                    # Recognize the activation word using Google's free API
-                    activation_text = self.recognizer.recognize_google(audio).lower()
+                    # 1. Listen for audio
+                    audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=3)
 
-                    if "juno" in activation_text:
+                    # 2. Convert audio to text
+                    recognized_text = self.recognizer.recognize_google(audio).lower()
+                    
+                    # ==================================================================== #
+                    # == NEW DEBUG LINE: This prints whatever the system heard.           == #
+                    # == This is the key to seeing what Juno is detecting.                == #
+                    rospy.loginfo(f"DEBUG: Juno heard: '{recognized_text}'")
+                    # ==================================================================== #
+
+                    # 3. Check if the wake word is in the recognized text
+                    if "hello" in recognized_text:
                         rospy.loginfo("Activation word detected!")
                         self.tts_engine.say("Yes?")
                         self.tts_engine.runAndWait()
 
-                        # Listen for the actual command
+                        # 4. Listen for the actual command that follows
                         rospy.loginfo("Listening for command...")
                         command_audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=5)
                         command_text = self.recognizer.recognize_google(command_audio)
-                        rospy.loginfo("User command: %s", command_text)
-
-                        # Publish the command as a ROS message
+                        
+                        # This log info was already here and is also very useful
+                        rospy.loginfo("User command heard: %s", command_text)
+                        
+                        # 5. Publish the command for the manager node
                         self.command_pub.publish(command_text)
 
                 except sr.WaitTimeoutError:
-                    pass # It's normal to have silence
+                    # This happens when you don't say anything, it's normal.
+                    pass 
                 except sr.UnknownValueError:
-                    rospy.logwarn("Google Speech Recognition could not understand audio")
-                except sr.RequestError as e:
+                    # This happens when speech is detected, but it's not clear enough to recognize.
+                    rospy.logwarn("--> Could not understand audio, please speak more clearly.")
+                except sr.RequestError as e: 
                     rospy.logerr("Could not request results from Google; {0}".format(e))
 
-# --- MAIN EXECUTION ---
 if __name__ == '__main__':
     try:
-        interface = SpeechInterface()
-        interface.listen_for_commands()
+        SpeechInterface().listen_for_commands()
     except rospy.ROSInterruptException:
         pass

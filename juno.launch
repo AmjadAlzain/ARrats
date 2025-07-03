@@ -16,4 +16,28 @@
         output="screen"
         launch-prefix="bash -c 'sleep 3; $0 $@' "/>
 
+  <node name="google_ocr_node"
+        pkg="allergen_scanner"
+        type="google_ocr_node.py"
+        output="screen" />
+
+  <node name="allergen_detection_node"
+        pkg="allergen_scanner"
+        type="allergen_detection_node.py"
+        output="screen" />
+
+  <node name="capture_preprocess_node"
+        pkg="allergen_scanner"
+        type="capture_preprocess_node.py"
+        output="screen" />
+
+  <node name="ocr_node"
+        pkg="allergen_scanner"
+        type="ocr_node.py"
+        output="screen" />
+
+  <node name="verbal_reporter_node"
+        pkg="allergen_scanner"
+        type="verbal_reporter_node.py"
+        output="screen" />
 </launch>
