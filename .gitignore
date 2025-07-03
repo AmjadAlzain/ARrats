@@ -1,6 +1,0 @@
-# Ignore the directory containing sensitive key files
-Keys/
-
-# Ignore Python bytecode files
-*.pyc
-__pycache__/
