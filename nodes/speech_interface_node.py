@@ -1,77 +1,95 @@
 #!/usr/bin/env python
-# --- IMPORTS ---
 import rospy
 import speech_recognition as sr
 import pyttsx3
 from std_msgs.msg import String
 
-# --- CLASS DEFINITION ---
 class SpeechInterface:
     def __init__(self):
-        # Initialize ROS node
         rospy.init_node('speech_interface_node', anonymous=True)
-
-        # Publisher for user commands (text)
         self.command_pub = rospy.Publisher('/juno/user_command', String, queue_size=10)
+        self.camera_cmd_pub = rospy.Publisher('/juno/camera_control_command', String, queue_size=1)
 
-        # Subscriber for robot responses (text)
         rospy.Subscriber('/juno/robot_response', String, self.speak_response)
+        
+        rospy.Subscriber('/juno/speech_control', String, self.handle_control_command)
 
-        # Initialize Text-to-Speech (TTS) engine
         self.tts_engine = pyttsx3.init()
-
-        # Initialize Speech-to-Text (STT) recognizer
         self.recognizer = sr.Recognizer()
         self.microphone = sr.Microphone()
+        
+        self.mode = "idle" # Can be "idle" or "camera_command"
 
-        # Calibrate microphone for ambient noise
         with self.microphone as source:
-            rospy.loginfo("Calibrating microphone for ambient noise...")
+            rospy.loginfo("Calibrating microphone...")
             self.recognizer.adjust_for_ambient_noise(source)
             rospy.loginfo("Calibration complete. Ready to listen.")
 
     def speak_response(self, msg):
-        """Callback function to speak out the robot's response."""
         rospy.loginfo("Juno says: %s", msg.data)
         self.tts_engine.say(msg.data)
         self.tts_engine.runAndWait()
 
+    def handle_control_command(self, msg):
+        if msg.data == 'camera_mode':
+            rospy.loginfo("Entering camera command mode.")
+            self.mode = "camera_command"
+        elif msg.data == 'idle_mode':
+            rospy.loginfo("Returning to idle mode.")
+            self.mode = "idle"
+            
     def listen_for_commands(self):
-        """Main loop to listen for the activation word and subsequent commands."""
         while not rospy.is_shutdown():
-            with self.microphone as source:
-                rospy.loginfo("Listening for activation word 'Juno'...")
-                try:
-                    # Listen for audio with a timeout
-                    audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=2)
-                    # Recognize the activation word using Google's free API
-                    activation_text = self.recognizer.recognize_google(audio).lower()
+            if self.mode == "idle":
+                self.listen_for_activation()
+            elif self.mode == "camera_command":
+                self.listen_for_camera_command()
+            else:
+                rospy.sleep(0.1)
 
-                    if "juno" in activation_text:
-                        rospy.loginfo("Activation word detected!")
-                        self.tts_engine.say("Yes?")
-                        self.tts_engine.runAndWait()
+    def listen_for_activation(self):
+        rospy.loginfo("Listening for activation word 'hello'...")
+        with self.microphone as source:
+            try:
+                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=3)
+                recognized_text = self.recognizer.recognize_google(audio).lower()
+                rospy.loginfo(f"DEBUG: Juno heard: '{recognized_text}'")
+                if "hello" in recognized_text:
+                    rospy.loginfo("Activation word detected!")
+                    self.tts_engine.say("Yes?")
+                    self.tts_engine.runAndWait()
+                    rospy.loginfo("Listening for command...")
+                    command_audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=5)
+                    command_text = self.recognizer.recognize_google(command_audio)
+                    rospy.loginfo("User command heard: %s", command_text)
+                    self.command_pub.publish(command_text)
+            except (sr.WaitTimeoutError, sr.UnknownValueError):
+                pass 
+            except sr.RequestError as e: 
+                rospy.logerr("Could not request results from Google; {0}".format(e))
+    
+    def listen_for_camera_command(self):
+        rospy.loginfo("Listening for 'capture' or 'quit'...")
+        with self.microphone as source:
+            try:
+                audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=3)
+                recognized_text = self.recognizer.recognize_google(audio).lower()
+                rospy.loginfo(f"DEBUG (Camera Mode): Heard '{recognized_text}'")
+                if 'capture' in recognized_text:
+                    rospy.loginfo("'capture' command heard.")
+                    self.camera_cmd_pub.publish('capture')
+                    self.mode = "paused" # Temporarily pause while vision node processes
+                elif 'quit' in recognized_text or 'cancel' in recognized_text:
+                    rospy.loginfo("'quit' command heard.")
+                    self.camera_cmd_pub.publish('quit')
+                    self.mode = "paused" # Temporarily pause
+            except (sr.WaitTimeoutError, sr.UnknownValueError):
+                pass
+            except sr.RequestError as e:
+                rospy.logerr("Could not request results from Google; {0}".format(e))                
 
-                        # Listen for the actual command
-                        rospy.loginfo("Listening for command...")
-                        command_audio = self.recognizer.listen(source, timeout=5, phrase_time_limit=5)
-                        command_text = self.recognizer.recognize_google(command_audio)
-                        rospy.loginfo("User command: %s", command_text)
-
-                        # Publish the command as a ROS message
-                        self.command_pub.publish(command_text)
-
-                except sr.WaitTimeoutError:
-                    pass # It's normal to have silence
-                except sr.UnknownValueError:
-                    rospy.logwarn("Google Speech Recognition could not understand audio")
-                except sr.RequestError as e:
-                    rospy.logerr("Could not request results from Google; {0}".format(e))
-
-# --- MAIN EXECUTION ---
 if __name__ == '__main__':
     try:
-        interface = SpeechInterface()
-        interface.listen_for_commands()
+        SpeechInterface().listen_for_commands()
     except rospy.ROSInterruptException:
         pass

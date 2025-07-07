@@ -3,8 +3,8 @@ import rospy
 import os
 import cv2
 import numpy as np
-import threading
-import queue  # Correct Python 3 import
+import threading # Use threading to handle service requests and camera operations concurrently
+import queue # Use a queue to safely pass results between threads
 
 from google.cloud import vision
 from std_msgs.msg import String
@@ -22,7 +22,6 @@ class InteractiveVisionNode:
     def __init__(self):
         rospy.init_node('interactive_vision_node')
 
-        # --- NEW: State variable to hold the voice command ---
         self.camera_action = None
         
         # --- THREADING: Tools to communicate between the service thread and the main thread ---
