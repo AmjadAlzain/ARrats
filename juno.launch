@@ -1,19 +1,22 @@
 <launch>
+    <!-- Node 1: The Ears and Mouth -->
+    <node name="speech_interface_node"
+          pkg="allergen_scanner"
+          type="speech_interface_node.py"
+          output="screen" />
 
-  <node name="speech_interface_node"
-        pkg="allergen_scanner"
-        type="speech_interface_node.py"
-        output="screen" />
+    <!-- Node 2: The Brain and Logic Controller -->
+    <node name="allergen_manager_node"
+          pkg="allergen_scanner"
+          type="allergen_manager_node.py"
+          output="screen" />
 
-  <node name="vision_node"
-        pkg="allergen_scanner"
-        type="vision_node.py"
-        output="screen" />
+      <!-- Node 3: The Eyes with Google OCR -->
+    <node name="interactive_vision_node"
+          pkg="allergen_scanner"
+          type="interactive_vision_node.py"
+          output="screen" 
+        launch-prefix="bash -c 'sleep 2; $0 $@' "/> <!-- a small delay -->
 
-  <node name="allergen_manager_node"
-        pkg="allergen_scanner"
-        type="allergen_manager_node.py"
-        output="screen"
-        launch-prefix="bash -c 'sleep 3; $0 $@' "/>
 
 </launch>
